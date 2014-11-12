@@ -25,6 +25,7 @@ username = os.getlogin()
 uid = os.getuid()
 gid = os.getgid()
 HOME_PATH='home/%s' % username
+backup_dir_location='%s/backup' % os.getenv('HOME')
 
 # Add elem as the example
 obj_to_exclude = [
@@ -70,20 +71,20 @@ def filter_function(tarinfo):
 def is_dir_ok():
     """ Check if backup dir is ready """
 
-    if not os.path.exists("backup"):
+    if not os.path.exists(backup_dir_location):
         try:
-            os.mkdir("backup")
+            os.mkdir(backup_dir_location)
         except OSError, err:
             raise err
 
 def main():
     """ main """
 
-    print "Start backing your files bro!"
+    print "%s Start backing your files bro! %s" %(bcolors.HEADER, bcolors.ENDC)
     timestamp = datetime.datetime.now().strftime('%d-%b-%Hh-%Mm-%G')
     pc_name = os.uname()[1]
     # Path to the created tar file ( change as you want )
-    tar_name = '/home/%s/backup/pc-backup-%s.tar.gz' % (username, timestamp)
+    tar_name = '%s/backup/%s-backup-%s.tar.gz' % (os.getenv('HOME'), pc_name, timestamp)
 
     is_dir_ok()
 
@@ -92,12 +93,12 @@ def main():
         print "Backing ..."
         for obj in obj_to_include:
             verboseprint("-------------------------")
-            verboseprint("| Adding ", obj, " folder to backup")
+            verboseprint("| Adding ", obj, " directory/file to backup")
             verboseprint("-------------------------")
             tar.add(obj, filter=filter_function)
         tar.close()
     except tarfile.TarError, tarexc:
-        print tarexc
+        raise tarexc
 
     print "Your backup archive is ready!"
     print "You can find it at: [%r]" % tar_name
