@@ -18,24 +18,16 @@ import os
 import tarfile
 import argparse
 import fnmatch
+import ConfigParser
 
 from pprint import pprint
+
+CONFIG_FILE=".backup"
 
 username = os.getlogin()
 uid = os.getuid()
 gid = os.getgid()
-HOME_PATH='home/%s' % username
 backup_dir_location='%s/backup' % os.getenv('HOME')
-
-# Add elem as the example
-obj_to_exclude = [
-    "%s/backup" % HOME_PATH,
-]
-
-# Add elem as the example
-obj_to_include = [
-    "/home/%s" % username
-]
 
 class bcolors:
     HEADER = '\033[95m'
@@ -51,17 +43,31 @@ def mk_parser():
     parser = argparse.ArgumentParser(
                     description="Backup your files and store it using tar command")
 
+    # Verbose
     parser.add_argument(
                 "-v", "--verbose", action='store_true', default=False,
                 help="slightly more verbose during backup" )
+
+    # Files to backup
+    parser.add_argument('--backup', '-b', type=argparse.FileType('r'),
+                        help="path of the file containing objects to backup")
+
+    # Upload tarball on FTP server
+    parser.add_argument('--ftp', '-f', action='store_true', default=False,
+                        help="path of the file containing objects to backup")
 
     return parser
 
 def filter_function(tarinfo):
     """ Filter to exclude some dir/file from backup """
+    try:
+        excludes = config.items("excludes")
+    except:
+        print "NoSectionError: error in your config files, please check if section 'excludes' exist in [%s] config file" % CONFIG_FILE
+        sys.exit(0)
 
-    for obj in obj_to_exclude:
-        if fnmatch.fnmatch(tarinfo.name, obj):
+    for key, path in excludes:
+        if fnmatch.fnmatch(tarinfo.name, path):
             verboseprint(bcolors.FAIL, '[Excluded]', bcolors.WARNING, tarinfo.name, bcolors.ENDC)
             return None
     else:
@@ -77,6 +83,13 @@ def is_dir_ok():
         except OSError, err:
             raise err
 
+
+def touch(path):
+    """ Small fucntion to create an empty file """
+
+    with open(path, 'a'):
+        os.utime(path, None)
+
 def main():
     """ main """
 
@@ -89,16 +102,32 @@ def main():
     is_dir_ok()
 
     try:
+        includes = config.items("includes")
+    except:
+        print "NoSectionError: error in your config files, please check if section 'includes' exist in [%s] config file" % CONFIG_FILE
+        sys.exit(0)
+
+    liste = list()
+    for key, path in includes:
+        liste.append(path)
+
+    try:
         tar = tarfile.open(tar_name, 'w:gz')
         print "Backing ..."
-        for obj in obj_to_include:
+
+        for obj in liste:
             verboseprint("-------------------------")
-            verboseprint("| Adding ", obj, " directory/file to backup")
+            verboseprint("| Adding ", obj.strip("\n"), " directory/file to backup")
             verboseprint("-------------------------")
-            tar.add(obj, filter=filter_function)
+            tar.add(obj.strip("\n"), filter=filter_function)
         tar.close()
     except tarfile.TarError, tarexc:
         raise tarexc
+
+    if options.ftp:
+        print ftp.storbinary("STOR " + os.path.basename(tar_name), open(tar_name)) # Send the file
+        ftp.quit()
+        print "Your file [%s] was uploaded succefully on %s!" % (tar_name, config.get("ftp", "server_address"))
 
     print "Your backup archive is ready!"
     print "You can find it at: [%r]" % tar_name
@@ -108,6 +137,12 @@ if __name__ == '__main__':
     parser = mk_parser()
     options = parser.parse_args(args)
 
+    config = ConfigParser.RawConfigParser()
+    if os.path.exists(CONFIG_FILE):
+        config.read(CONFIG_FILE)
+    else:
+        touch(CONFIG_FILE)
+
     if options.verbose:
         # Verbose function:  add/remove thing to do when -v option is set
         def verboseprint(*args):
@@ -116,4 +151,23 @@ if __name__ == '__main__':
             print
     else:
         verboseprint = lambda *a: None      # do-nothing function
+
+    if options.backup:
+        f = open(options.backup.name);
+        lines = f.readlines()
+        f.close()
+
+    if options.ftp:
+        import ftplib
+
+        ftp = ftplib.FTP()
+        print ftp.connect(config.get("ftp", "server_address"), 21)
+        try:
+            print "Logging in..."
+            print ftp.login(config.get("ftp", "username"), config.get("ftp", "password"))
+            print ftp.cwd(config.get("ftp", "upload_dir"))
+        except:
+            print "503: Inccorect login."
+            sys.exit(0)
+
     main()

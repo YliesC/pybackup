@@ -1,0 +1,13 @@
+[ftp]
+server_address=SERVER_ADDRESS
+username=USERNAME
+password=PASSWORD
+upload_dir=dir_to_upload_on_ftp
+
+[includes]
+home = /home/
+etc = /etc/
+
+[excludes]
+example1 = /path/to/files/to/excludes
+example2 = /path/to/files/to/excludes
