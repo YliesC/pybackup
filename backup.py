@@ -48,13 +48,9 @@ def mk_parser():
                 "-v", "--verbose", action='store_true', default=False,
                 help="slightly more verbose during backup" )
 
-    # Files to backup
-    parser.add_argument('--backup', '-b', type=argparse.FileType('r'),
-                        help="path of the file containing objects to backup")
-
     # Upload tarball on FTP server
     parser.add_argument('--ftp', '-f', action='store_true', default=False,
-                        help="path of the file containing objects to backup")
+                        help="upload your backup on an ftp server and keep a local version")
 
     return parser
 
@@ -151,11 +147,6 @@ if __name__ == '__main__':
             print
     else:
         verboseprint = lambda *a: None      # do-nothing function
-
-    if options.backup:
-        f = open(options.backup.name);
-        lines = f.readlines()
-        f.close()
 
     if options.ftp:
         import ftplib
